@@ -40,7 +40,7 @@ Here’s an example of a completed configuration file:
 STOCK_API_URL = "https://www.alphavantage.co/query"
 API_KEY = "ABCDEFG123456789"
 NOTION_API_TOKEN = "secret_xxxxyyyyzzzz"
-DATABASE_ID = "abc12345def67890ghi12345jkl67890"
+DATABASE_ID = "abc12345"
 EXCLUDE_KEYWORDS = "loan,debt"
 ```
 
