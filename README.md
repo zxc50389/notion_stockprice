@@ -9,7 +9,7 @@ Follow the steps below to correctly populate the configuration file with the req
 
 2. **API_KEY**:  
    This is the unique API key provided by Alpha Vantage. To get your API key:  
-   - Go to [Alpha Vantage's website](https://www.alphavantage.co/).
+   - Go to twelvedata.com
    - Sign up for an account or log in.
    - Locate your API key in the account settings or dashboard.
    Replace `your alphavantage key` with your actual API key.
