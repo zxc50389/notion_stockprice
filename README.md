@@ -37,7 +37,6 @@ Follow the steps below to correctly populate the configuration file with the req
 ### Example Configuration
 Here’s an example of a completed configuration file:  
 ```plaintext
-STOCK_API_URL = "https://www.alphavantage.co/query"
 API_KEY = "ABCDEFG123456789"
 NOTION_API_TOKEN = "secret_xxxxyyyyzzzz"
 DATABASE_ID = "abc12345"
