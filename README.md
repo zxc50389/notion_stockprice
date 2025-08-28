@@ -4,7 +4,7 @@ Follow the steps below to correctly populate the configuration file with the req
 1. **STOCK_API_URL**:  
    This is the URL endpoint for the stock API you want to use. For example, if you are using Alpha Vantage, set this as:  
    ```plaintext
-   https://www.alphavantage.co/query
+   https://twelvedata.com/
    ```
 
 2. **API_KEY**:  
