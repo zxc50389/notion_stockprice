@@ -2,15 +2,12 @@ import requests
 from notion_client import Client
 from datetime import datetime
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
 
 def lambda_handler(event, context):
-    # 設定 logging
     logging.basicConfig(level=logging.DEBUG, force=True)
     logger = logging.getLogger(__name__)
 
-    # 環境變數設置
     REQUIRED_ENV_VARS = ["BOT_TOKEN", "CHAT_ID", "API_KEY", "NOTION_API_TOKEN", "DATABASE_ID"]
     missing_vars = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
     if missing_vars:
@@ -25,7 +22,6 @@ def lambda_handler(event, context):
     EXCLUDE_KEYWORDS = os.getenv("EXCLUDE_KEYWORDS", "").split(",")
 
     notion = None
-
     def get_notion_client():
         nonlocal notion
         if notion is None:
@@ -70,27 +66,29 @@ def lambda_handler(event, context):
         logger.debug(f"取得的股票資料: {stocks}")
         return stocks
 
-    def get_stock_price(symbol):
-        """用 Twelve Data API 獲取每日收盤價"""
+    def get_stock_prices_batch(symbols):
+        """一次查多檔股票價格"""
         url = "https://api.twelvedata.com/time_series"
         params = {
-            "symbol": symbol,
+            "symbol": ",".join(symbols),
             "interval": "1day",
-            "outputsize": 2,  # 取前兩天，以確保抓到最新交易日收盤價
+            "outputsize": 2,
             "apikey": API_KEY
         }
         try:
             resp = requests.get(url, params=params)
             resp.raise_for_status()
             data = resp.json()
-            if "values" in data and len(data["values"]) > 0:
-                # 最新一個交易日收盤價
-                return float(data["values"][0]["close"])
-            else:
-                logger.warning(f"Twelve Data 沒有回傳 {symbol} 的收盤價。")
+            results = {}
+            for sym in symbols:
+                if sym in data and "values" in data[sym] and len(data[sym]["values"]) > 0:
+                    results[sym] = float(data[sym]["values"][0]["close"])
+                else:
+                    logger.warning(f"Twelve Data 沒有回傳 {sym} 的收盤價。")
+            return results
         except Exception as e:
-            logger.error(f"獲取 {symbol} 收盤價時出現錯誤: {e}")
-        return None
+            logger.error(f"批次獲取股價時出錯: {e}")
+            return {}
 
     def update_stock_price(page_id, price, stock_symbol):
         if price is not None:
@@ -101,7 +99,6 @@ def lambda_handler(event, context):
                     properties={"Price": {"number": price}}
                 )
                 logger.info(f"已更新 Page {page_id} 的股價（{stock_symbol}）為 {price}")
-                logger.debug(f"更新結果: {response}")
             except Exception as e:
                 logger.error(f"更新 Page {page_id}（{stock_symbol}）時出現錯誤: {e}")
         else:
@@ -112,16 +109,17 @@ def lambda_handler(event, context):
         logger.info("未在資料庫中找到任何股票代碼。")
         return {"statusCode": 200, "body": "未找到股票代碼"}
 
-    # 限制並行數量，避免 Twelve Data 429
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        futures = {executor.submit(get_stock_price, stock["symbol"]): stock for stock in stocks}
-        for future in as_completed(futures):
-            stock = futures[future]
-            try:
-                price = future.result()
-                update_stock_price(stock["id"], price, stock["symbol"])
-            except Exception as e:
-                logger.error(f"處理 {stock['symbol']} 時出現錯誤: {e}")
+    # 🔥 一次最多查 8 檔（依 Twelve Data 免費版限制）
+    batch_size = 8
+    for i in range(0, len(stocks), batch_size):
+        batch = stocks[i:i+batch_size]
+        symbols = [s["symbol"] for s in batch]
+        logger.info(f"處理第 {i//batch_size + 1} 批股票，共 {len(batch)} 支")
+
+        prices = get_stock_prices_batch(symbols)
+        for stock in batch:
+            price = prices.get(stock["symbol"])
+            update_stock_price(stock["id"], price, stock["symbol"])
 
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     send_telegram_message(f"所有股票價格已更新完成！更新時間：{current_time}")
